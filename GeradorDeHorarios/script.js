@@ -1,4 +1,3 @@
-// Constantes do sistema
 const NUM_PROFESSORES = 10;
 const NUM_MATERIAS = 25;
 const NUM_INDIVIDUOS = 50;
@@ -6,24 +5,20 @@ const NUM_PERIODOS = 5;
 const DIAS_SEMANA = 5;
 const HORARIOS_DIA = 4;
 
-// Variáveis globais
 let individuos = [];
 let professores = [];
 let materias = [];
 let notas = [];
 let conflitosPorIndividuo = [];
 
-// Elementos do DOM
 const btnGerar = document.getElementById('gerarMatriz');
 const btnAvaliar = document.getElementById('avaliarIndividuos');
 const btnOrdenar = document.getElementById('ordenarIndividuos');
 
-// Event Listeners
 btnGerar.addEventListener('click', gerarMatriz);
 btnAvaliar.addEventListener('click', avaliacao);
 btnOrdenar.addEventListener('click', ordenacao);
 
-// Funções de formatação (permanecem as mesmas)
 function formatarCodigoProfessor(num) {
     return `P${num.toString().padStart(2, '0')}`;
 }
@@ -32,13 +27,11 @@ function formatarCodigoMateria(num) {
     return `M${num.toString().padStart(2, '0')}`;
 }
 
-// Inicialização dos dados (permanece a mesma)
 function inicializarDados() {
     professores = Array.from({length: NUM_PROFESSORES}, (_, i) => formatarCodigoProfessor(i + 1));
     materias = Array.from({length: NUM_MATERIAS}, (_, i) => formatarCodigoMateria(i + 1));
 }
 
-// Geração da população inicial (permanece a mesma)
 function gerarPropostaHorario() {
     const proposta = [];
     
@@ -75,7 +68,6 @@ function gerarMatriz() {
     btnOrdenar.disabled = false;
 }
 
-// Função de exibição da matriz (atualizada para incluir ordenação)
 function exibirMatriz() {
     const container = document.getElementById('matrizContainer');
     container.innerHTML = '';
@@ -145,7 +137,6 @@ function exibirMatriz() {
     table.appendChild(tbody);
     container.appendChild(table);
     
-    // Legenda permanece a mesma
     const legend = document.createElement('div');
     legend.className = 'info-panel';
     legend.innerHTML = `
@@ -167,7 +158,6 @@ function exibirMatriz() {
     container.appendChild(legend);
 }
 
-// Função de avaliação atualizada
 function avaliacao() {
     conflitosPorIndividuo = new Array(NUM_INDIVIDUOS).fill(0);
     notas = new Array(NUM_INDIVIDUOS).fill(0);
@@ -175,7 +165,6 @@ function avaliacao() {
     for (let i = 0; i < NUM_INDIVIDUOS; i++) {
         let totalConflitos = 0;
         
-        // 1. Conflitos de professor no mesmo horário
         for (let h = 0; h < 20; h++) {
             const professoresNoHorario = new Set();
             for (let p = 0; p < NUM_PERIODOS; p++) {
@@ -189,7 +178,6 @@ function avaliacao() {
             }
         }
         
-        // 2. Matérias repetidas no mesmo dia
         for (let p = 0; p < NUM_PERIODOS; p++) {
             for (let d = 0; d < DIAS_SEMANA; d++) {
                 const materiasNoDia = new Set();
@@ -211,15 +199,11 @@ function avaliacao() {
     exibirMatriz();
 }
 
-// Função de ordenação otimizada
 function ordenacao() {
-    // Criar array de índices para ordenação
     const indices = Array.from({length: NUM_INDIVIDUOS}, (_, i) => i);
     
-    // Ordenar os índices com base nos conflitos
     indices.sort((a, b) => conflitosPorIndividuo[a] - conflitosPorIndividuo[b]);
     
-    // Reordenar os arrays principais
     const novosIndividuos = [];
     const novosConflitos = [];
     const novasNotas = [];
@@ -230,11 +214,33 @@ function ordenacao() {
         novasNotas.push(notas[indices[i]]);
     }
     
-    // Atualizar os arrays globais
     individuos = novosIndividuos;
     conflitosPorIndividuo = novosConflitos;
     notas = novasNotas;
     
-    // Atualizar a exibição
     exibirMatriz();
+
+    function selecao(contGen, maxGen) {
+        const pais = [];
+    
+        const melhorMetade = Math.floor(NUM_INDIVIDUOS / 2);
+        const melhorQuarto = Math.floor(NUM_INDIVIDUOS / 4);
+    
+        if (contGen < maxGen / 2) {
+            const pos1 = Math.floor(Math.random() * melhorMetade);
+            const pos2 = Math.floor(Math.random() * NUM_INDIVIDUOS);
+    
+            pais[0] = [...individuos[pos1]];
+            pais[1] = [...individuos[pos2]];
+        } else {
+            const pos1 = Math.floor(Math.random() * melhorQuarto);
+            const pos2 = Math.floor(Math.random() * melhorMetade);
+    
+            pais[0] = [...individuos[pos1]];
+            pais[1] = [...individuos[pos2]];
+        }
+    
+        return pais;
+    }
+    
 }
