@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Super Horáriotron 3000</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css" />
 </head>
 <body>
     <h1>Super Horáriotron 3000</h1>
@@ -13,9 +13,14 @@
         <button id="gerarMatriz">Gerar Matriz Inicial</button>
         <button id="avaliarIndividuos" disabled>Avaliar Indivíduos</button>
         <button id="ordenarIndividuos" disabled>Ordenar por Conflitos</button>
+        <button id="executarAG" disabled>Executar Algoritmo Genético</button>
+
     </div>
 
-    <div id="matrizContainer"></div>
+    <div id="matrizContainer" class="matrix-container"></div>
+    <div id="melhorHorarioContainer" class="matrix-container"></div>
+    <div id="status" class="info-panel"></div>
+    
 
     <script src="script.js"></script>
 </body>
