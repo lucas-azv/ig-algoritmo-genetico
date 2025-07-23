@@ -46,11 +46,13 @@ function gerarPropostaHorario() {
 function gerarMatriz() {
     inicializarDados();
     individuos = [];
+    notas = new Array(NUM_INDIVIDUOS).fill(0);
+    conflitosPorIndividuo = new Array(NUM_INDIVIDUOS).fill(0);
+    conflitosDetalhados = Array.from({length: NUM_INDIVIDUOS}, () => []);
+
     for (let i = 0; i < NUM_INDIVIDUOS; i++) {
         individuos.push(gerarPropostaHorario());
     }
-    // Após gerar a matriz, é bom avaliá-la imediatamente para ter os conflitos iniciais
-    avaliacao(); // Adicionado para inicializar conflitosDetalhados e conflitosPorIndividuo
     exibirMatriz();
     document.getElementById('avaliarIndividuos').disabled = false;
     document.getElementById('ordenarIndividuos').disabled = false;
@@ -60,21 +62,15 @@ function gerarMatriz() {
 function avaliacao() {
     conflitosPorIndividuo = new Array(NUM_INDIVIDUOS).fill(0);
     notas = new Array(NUM_INDIVIDUOS).fill(0);
-    // Inicializa conflitosDetalhados para cada indivíduo como um array vazio
     conflitosDetalhados = Array.from({length: NUM_INDIVIDUOS}, () => []);
 
     for (let i = 0; i < NUM_INDIVIDUOS; i++) {
         let totalConflitos = 0;
 
-        // Conflito de Professor: Mesmo professor em múltiplos períodos no MESMO HORÁRIO GLOBAL
-        // Iteramos pelos 20 "slots de horário" que se repetem em cada período.
-        // O total de slots por período é DIAS_SEMANA * HORARIOS_DIA = 5 * 4 = 20.
         for (let h = 0; h < (DIAS_SEMANA * HORARIOS_DIA); h++) {
             const professoresNoHorario = new Set();
             for (let p = 0; p < NUM_PERIODOS; p++) {
-                // Posição absoluta do slot na grade do indivíduo
                 const posicao = p * (DIAS_SEMANA * HORARIOS_DIA) + h;
-                // Certifique-se de que a posição existe no indivíduo
                 if (posicao >= individuos[i].length) continue;
 
                 const [professor] = individuos[i][posicao].split('-');
@@ -82,7 +78,7 @@ function avaliacao() {
                 if (professoresNoHorario.has(professor)) {
                     totalConflitos++;
                     notas[i] += 10;
-                    conflitosDetalhados[i].push(posicao); // Registra a posição do conflito
+                    conflitosDetalhados[i].push(posicao);
                 }
                 professoresNoHorario.add(professor);
             }
@@ -112,6 +108,11 @@ function avaliacao() {
 }
 
 function ordenacao() {
+    if (conflitosPorIndividuo.every(val => val === 0) && notas.every(val => val === 0)) {
+        alert("Por favor, avalie os indivíduos primeiro.");
+        return;
+    }
+
     const indices = Array.from({length: NUM_INDIVIDUOS}, (_, i) => i);
     indices.sort((a, b) => conflitosPorIndividuo[a] - conflitosPorIndividuo[b]);
 
@@ -142,21 +143,23 @@ function executarAG() {
     const status = document.getElementById('status');
     status.innerText = "Executando algoritmo genético...";
 
+    if (conflitosPorIndividuo.every(val => val === 0) && notas.every(val => val === 0)) {
+        alert("Por favor, gere e avalie os indivíduos iniciais antes de executar o Algoritmo Genético.");
+        status.innerText = "Execução cancelada.";
+        return;
+    }
+
     for (let geracao = 0; geracao < NOVAS_GERACOES; geracao++) {
         const novaPopulacao = [];
         ordenacao();
 
-        // Cria a nova população
         for (let i = 0; i < NUM_INDIVIDUOS / 2; i++) {
-            // Pai1 dos 25% melhores, Pai2 dos 50% melhores
             const pai1 = individuos[Math.floor(Math.random() * (NUM_INDIVIDUOS / 4))];
             const pai2 = individuos[Math.floor(Math.random() * (NUM_INDIVIDUOS / 2))];
 
-            // Cruzamento
             const filho1 = cruzamento(pai1, pai2);
             const filho2 = cruzamento(pai2, pai1);
 
-            // Mutação (com 20% de chance)
             if (Math.random() < 0.2) mutacao(filho1);
             if (Math.random() < 0.2) mutacao(filho2);
 
@@ -181,6 +184,9 @@ function exibirMatriz() {
     header.innerHTML = '<th>Ind</th>' + Array.from({length: totalSlots}, (_, i) => `<th>H${i + 1}</th>`).join('') + '<th>Conflitos</th>';
     table.appendChild(header);
 
+    const avaliacaoFeita = conflitosDetalhados.length > 0 && conflitosPorIndividuo.length > 0 && conflitosPorIndividuo.some(val => val !== 0);
+
+
     for (let i = 0; i < individuos.length; i++) {
         const row = document.createElement('tr');
         let rowContent = `<td>${i + 1}</td>`;
@@ -191,13 +197,13 @@ function exibirMatriz() {
             const horario = individuos[i][j];
             let className = '';
 
-            if (conflitosDoIndividuo.includes(j)) {
+            if (avaliacaoFeita && conflitosDoIndividuo.includes(j)) {
                 className = 'conflito';
             }
             rowContent += `<td class="${className}">${horario}</td>`;
         }
 
-        rowContent += `<td>${conflitosPorIndividuo[i]}</td>`;
+        rowContent += `<td>${avaliacaoFeita ? conflitosPorIndividuo[i] : '-'}</td>`;
         row.innerHTML = rowContent;
         table.appendChild(row);
     }
@@ -206,10 +212,15 @@ function exibirMatriz() {
 
 function exibirMelhorIndividuo() {
     const container = document.getElementById('melhorHorarioContainer');
-    container.innerHTML = '<h2>Melhor Horário (Menos Conflitos)</h2>';
+    container.innerHTML = '<h2>Melhor Horário</h2>';
 
     if (individuos.length === 0) {
         container.innerHTML += "<p>Nenhum indivíduo disponível.</p>";
+        return;
+    }
+
+    if (conflitosPorIndividuo.every(val => val === 0) && notas.every(val => val === 0)) {
+        container.innerHTML += "<p>Por favor, execute o Algoritmo Genético primeiro para encontrar o melhor horário.</p>";
         return;
     }
 
