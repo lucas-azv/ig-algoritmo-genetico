@@ -11,8 +11,8 @@ let professores = [];
 let materias = [];
 let notas = [];
 let conflitosPorIndividuo = [];
+let conflitosDetalhados = [];
 
-// Utilitários
 function formatarCodigoProfessor(num) {
     return `P${num.toString().padStart(2, '0')}`;
 }
@@ -49,40 +49,58 @@ function gerarMatriz() {
     for (let i = 0; i < NUM_INDIVIDUOS; i++) {
         individuos.push(gerarPropostaHorario());
     }
+    // Após gerar a matriz, é bom avaliá-la imediatamente para ter os conflitos iniciais
+    avaliacao(); // Adicionado para inicializar conflitosDetalhados e conflitosPorIndividuo
     exibirMatriz();
     document.getElementById('avaliarIndividuos').disabled = false;
     document.getElementById('ordenarIndividuos').disabled = false;
     document.getElementById('executarAG').disabled = false;
-
-
 }
 
 function avaliacao() {
     conflitosPorIndividuo = new Array(NUM_INDIVIDUOS).fill(0);
     notas = new Array(NUM_INDIVIDUOS).fill(0);
+    // Inicializa conflitosDetalhados para cada indivíduo como um array vazio
+    conflitosDetalhados = Array.from({length: NUM_INDIVIDUOS}, () => []);
+
     for (let i = 0; i < NUM_INDIVIDUOS; i++) {
         let totalConflitos = 0;
-        for (let h = 0; h < 20; h++) {
+
+        // Conflito de Professor: Mesmo professor em múltiplos períodos no MESMO HORÁRIO GLOBAL
+        // Iteramos pelos 20 "slots de horário" que se repetem em cada período.
+        // O total de slots por período é DIAS_SEMANA * HORARIOS_DIA = 5 * 4 = 20.
+        for (let h = 0; h < (DIAS_SEMANA * HORARIOS_DIA); h++) {
             const professoresNoHorario = new Set();
             for (let p = 0; p < NUM_PERIODOS; p++) {
-                const posicao = p * 20 + h;
+                // Posição absoluta do slot na grade do indivíduo
+                const posicao = p * (DIAS_SEMANA * HORARIOS_DIA) + h;
+                // Certifique-se de que a posição existe no indivíduo
+                if (posicao >= individuos[i].length) continue;
+
                 const [professor] = individuos[i][posicao].split('-');
+
                 if (professoresNoHorario.has(professor)) {
                     totalConflitos++;
                     notas[i] += 10;
+                    conflitosDetalhados[i].push(posicao); // Registra a posição do conflito
                 }
                 professoresNoHorario.add(professor);
             }
         }
+
         for (let p = 0; p < NUM_PERIODOS; p++) {
             for (let d = 0; d < DIAS_SEMANA; d++) {
                 const materiasNoDia = new Set();
                 for (let h = 0; h < HORARIOS_DIA; h++) {
-                    const posicao = p * 20 + d * HORARIOS_DIA + h;
+                    const posicao = p * (DIAS_SEMANA * HORARIOS_DIA) + d * HORARIOS_DIA + h;
+                    if (posicao >= individuos[i].length) continue;
+
                     const [, materia] = individuos[i][posicao].split('-');
+
                     if (materiasNoDia.has(materia)) {
                         totalConflitos++;
                         notas[i] += 5;
+                        conflitosDetalhados[i].push(posicao);
                     }
                     materiasNoDia.add(materia);
                 }
@@ -96,9 +114,12 @@ function avaliacao() {
 function ordenacao() {
     const indices = Array.from({length: NUM_INDIVIDUOS}, (_, i) => i);
     indices.sort((a, b) => conflitosPorIndividuo[a] - conflitosPorIndividuo[b]);
+
     individuos = indices.map(i => individuos[i]);
     conflitosPorIndividuo = indices.map(i => conflitosPorIndividuo[i]);
     notas = indices.map(i => notas[i]);
+    conflitosDetalhados = indices.map(i => conflitosDetalhados[i]);
+
     exibirMatriz();
 }
 
@@ -120,16 +141,25 @@ function executarAG() {
     const NOVAS_GERACOES = 50;
     const status = document.getElementById('status');
     status.innerText = "Executando algoritmo genético...";
+
     for (let geracao = 0; geracao < NOVAS_GERACOES; geracao++) {
         const novaPopulacao = [];
         ordenacao();
+
+        // Cria a nova população
         for (let i = 0; i < NUM_INDIVIDUOS / 2; i++) {
+            // Pai1 dos 25% melhores, Pai2 dos 50% melhores
             const pai1 = individuos[Math.floor(Math.random() * (NUM_INDIVIDUOS / 4))];
             const pai2 = individuos[Math.floor(Math.random() * (NUM_INDIVIDUOS / 2))];
+
+            // Cruzamento
             const filho1 = cruzamento(pai1, pai2);
             const filho2 = cruzamento(pai2, pai1);
+
+            // Mutação (com 20% de chance)
             if (Math.random() < 0.2) mutacao(filho1);
             if (Math.random() < 0.2) mutacao(filho2);
+
             novaPopulacao.push(filho1, filho2);
         }
         individuos = novaPopulacao;
@@ -137,6 +167,7 @@ function executarAG() {
     }
     ordenacao();
     exibirMelhorIndividuo();
+    status.innerText = "Algoritmo genético concluído!";
     alert("Melhor horário encontrado após AG:");
 }
 
@@ -144,12 +175,30 @@ function exibirMatriz() {
     const container = document.getElementById('matrizContainer');
     container.innerHTML = '';
     const table = document.createElement('table');
+
     const header = document.createElement('tr');
-    header.innerHTML = '<th>Ind</th>' + Array.from({length: 100}, (_, i) => `<th>H${i + 1}</th>`).join('') + '<th>Conflitos</th>';
+    const totalSlots = NUM_PERIODOS * DIAS_SEMANA * HORARIOS_DIA;
+    header.innerHTML = '<th>Ind</th>' + Array.from({length: totalSlots}, (_, i) => `<th>H${i + 1}</th>`).join('') + '<th>Conflitos</th>';
     table.appendChild(header);
+
     for (let i = 0; i < individuos.length; i++) {
         const row = document.createElement('tr');
-        row.innerHTML = `<td>${i + 1}</td>` + individuos[i].map(h => `<td>${h}</td>`).join('') + `<td>${conflitosPorIndividuo[i]}</td>`;
+        let rowContent = `<td>${i + 1}</td>`;
+
+        const conflitosDoIndividuo = conflitosDetalhados[i] || [];
+
+        for (let j = 0; j < individuos[i].length; j++) {
+            const horario = individuos[i][j];
+            let className = '';
+
+            if (conflitosDoIndividuo.includes(j)) {
+                className = 'conflito';
+            }
+            rowContent += `<td class="${className}">${horario}</td>`;
+        }
+
+        rowContent += `<td>${conflitosPorIndividuo[i]}</td>`;
+        row.innerHTML = rowContent;
         table.appendChild(row);
     }
     container.appendChild(table);
@@ -166,28 +215,38 @@ function exibirMelhorIndividuo() {
 
     const melhorIndividuo = individuos[0];
     const conflitosMelhor = conflitosPorIndividuo[0];
+    const conflitosDetalhadosMelhor = conflitosDetalhados[0] || [];
 
     const table = document.createElement('table');
     table.className = 'matrix-table';
 
-    // Cabeçalho
     const header = document.createElement('tr');
-    header.innerHTML = '<th>Posição</th>' + melhorIndividuo.map((_, i) => `<th>H${i + 1}</th>`).join('') + '<th>Conflitos</th>';
+    const totalSlots = NUM_PERIODOS * DIAS_SEMANA * HORARIOS_DIA;
+    header.innerHTML = '<th>Posição</th>' + Array.from({length: totalSlots}, (_, i) => `<th>H${i + 1}</th>`).join('') + '<th>Conflitos</th>';
     table.appendChild(header);
 
-    // Linha do melhor indivíduo
     const row = document.createElement('tr');
-    row.innerHTML = `<td>Melhor</td>` + melhorIndividuo.map(h => `<td>${h}</td>`).join('') + `<td>${conflitosMelhor}</td>`;
+    let rowContent = `<td>Melhor</td>`;
+
+    for (let j = 0; j < melhorIndividuo.length; j++) {
+        const horario = melhorIndividuo[j];
+        let className = '';
+        if (conflitosDetalhadosMelhor.includes(j)) {
+            className = 'conflito';
+        }
+        rowContent += `<td class="${className}">${horario}</td>`;
+    }
+
+    rowContent += `<td>${conflitosMelhor}</td>`;
+    row.innerHTML = rowContent;
     table.appendChild(row);
 
     container.appendChild(table);
 }
 
-// Inicialização dos botões quando DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('gerarMatriz').addEventListener('click', gerarMatriz);
     document.getElementById('avaliarIndividuos').addEventListener('click', avaliacao);
     document.getElementById('ordenarIndividuos').addEventListener('click', ordenacao);
     document.getElementById('executarAG').addEventListener('click', executarAG);
-    
 });
